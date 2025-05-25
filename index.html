@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>犬の気持ち分析アプリ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f3f4f6; /* bg-gray-100 */
+            color: #374151; /* text-gray-700 */
+            margin: 0;
+            padding: 1rem;
+        }
+        .container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+        .image-container {
+            position: relative;
+            margin-top: 1.5rem; /* mt-6 */
+            margin-bottom: 1.5rem; /* mb-6 */
+            border: 2px dashed #d1d5db; /* border-gray-300 */
+            border-radius: 0.5rem; /* rounded-lg */
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden; /* 吹き出しが画像コンテナ内に収まるように */
+        }
+        .image-container img {
+            max-width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+            border-radius: 0.375rem; /* rounded-md */
+        }
+        .speech-bubble {
+            position: absolute;
+            background-color: white;
+            color: black;
+            padding: 0.75rem 1.25rem; /* p-3 px-5 */
+            border-radius: 1rem; /* rounded-2xl */
+            border: 3px solid #ec4899; /* border-pink-500 */
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            font-size: 1.25rem; /* text-xl, 文字を大きく */
+            font-weight: bold;
+            line-height: 1.6;
+            max-width: 75%;
+            text-align: center;
+            /* 画像の下部中央、少し内側に配置 */
+            bottom: 15px; /* 画像下端から15px上 */
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out, bottom 0.3s ease-in-out;
+            z-index: 10;
+            /* pointer-events: none; */ /* 必要に応じてコメント解除 */
+        }
+        .speech-bubble.visible {
+            opacity: 1;
+        }
+        .speech-bubble::after { /* 吹き出しのしっぽ */
+            content: '';
+            position: absolute;
+            /* しっぽを吹き出しの上部に配置 */
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 12px solid transparent;
+            border-right: 12px solid transparent;
+            /* しっぽの色を縁取りに合わせる */
+            border-bottom: 12px solid #ec4899; /* border-pink-500 */
+        }
+         /* しっぽの内側部分 (三角形を重ねて縁取りのように見せる) */
+        .speech-bubble::before {
+            content: '';
+            position: absolute;
+            bottom: calc(100% - 3px); /* 縁取りの太さ分ずらす */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent; /* しっぽ本体より少し小さく */
+            border-right: 10px solid transparent;
+            border-bottom: 10px solid white; /* 吹き出しの背景色 */
+            z-index: 1; /* しっぽ本体(after)より手前 */
+        }
+
+        .loader {
+            border: 4px solid #f3f4f6; /* bg-gray-100 */
+            border-top: 4px solid #3b82f6; /* border-blue-500 */
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .file-input-label {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background-color: #3b82f6; /* bg-blue-500 */
+            color: white;
+            border-radius: 0.375rem; /* rounded-md */
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .file-input-label:hover {
+            background-color: #2563eb; /* bg-blue-600 */
+        }
+        #imageUpload {
+            display: none; /* ネイティブのinputは隠す */
+        }
+        .error-message {
+            color: #ef4444; /* text-red-500 */
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-2xl sm:text-3xl font-bold mb-6 text-gray-800">わんちゃんの気持ち分析U・ᴥ・U</h1>
+        <p class="mb-4 text-gray-600">愛犬の写真をアップロードして、AIがその気持ちを読み取ります！</p>
+
+        <div>
+            <label for="imageUpload" class="file-input-label">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                </svg>
+                写真を選ぶ
+            </label>
+            <input type="file" id="imageUpload" accept="image/*">
+        </div>
+
+        <div id="imagePreviewContainer" class="image-container">
+            <p id="initialMessage" class="text-gray-500">ここに写真が表示されます</p>
+            <img id="uploadedImage" src="#" alt="アップロードされた犬の画像" class="hidden"/>
+            <div id="speechBubble" class="speech-bubble">
+                <p id="dogEmotion"></p>
+            </div>
+        </div>
+
+        <div id="loader" class="loader hidden"></div>
+        <p id="errorMessage" class="error-message hidden"></p>
+        <p id="apiNote" class="text-xs text-gray-500 mt-4">AIによる分析結果は、必ずしも正確な犬の気持ちを表すものではありません。エンターテイメントとしてお楽しみください。</p>
+    </div>
+
+    <script>
+        const imageUpload = document.getElementById('imageUpload');
+        const uploadedImage = document.getElementById('uploadedImage');
+        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+        const initialMessage = document.getElementById('initialMessage');
+        const speechBubble = document.getElementById('speechBubble');
+        const dogEmotion = document.getElementById('dogEmotion');
+        const loader = document.getElementById('loader');
+        const errorMessage = document.getElementById('errorMessage');
+
+        let currentImageBase64 = null;
+
+        imageUpload.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                initialMessage.classList.add('hidden');
+                uploadedImage.classList.remove('hidden');
+                speechBubble.classList.remove('visible');
+                errorMessage.classList.add('hidden');
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    uploadedImage.src = e.target.result;
+                    currentImageBase64 = e.target.result.split(',')[1];
+                    analyzeDogEmotion(currentImageBase64, file.type);
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        async function analyzeDogEmotion(base64ImageData, mimeType) {
+            if (!base64ImageData) {
+                showError("画像データがありません。");
+                return;
+            }
+
+            loader.classList.remove('hidden');
+            speechBubble.classList.remove('visible');
+            dogEmotion.textContent = '';
+
+            const prompt = "この画像に写っている犬の気持ちを一言で表す、15文字程度の短いセリフを日本語で生成してください。犬の表情や状況から判断し、犬が考えていそうな言葉をそのまま記述してください。例：「おなかいっぱい！」「遊んで！」「眠いなあ」「これ好き！」";
+
+            const payload = {
+                contents: [
+                    {
+                        role: "user",
+                        parts: [
+                            { text: prompt },
+                            {
+                                inlineData: {
+                                    mimeType: mimeType || "image/jpeg",
+                                    data: base64ImageData
+                                }
+                            }
+                        ]
+                    }
+                ],
+                generationConfig: {
+                    // temperature: 0.7,
+                    // maxOutputTokens: 30,
+                }
+            };
+
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error("API Error Response:", errorData);
+                    throw new Error(`APIリクエストに失敗しました: ${response.status} ${response.statusText}. ${errorData?.error?.message || ''}`);
+                }
+
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    let text = result.candidates[0].content.parts[0].text;
+                    const quoteMatch = text.match(/[「『]([^」』]+)[」』]/);
+                    if (quoteMatch && quoteMatch[1]) {
+                        text = quoteMatch[1];
+                    } else {
+                        text = text.trim();
+                    }
+                    dogEmotion.textContent = text;
+                    speechBubble.classList.add('visible');
+                } else {
+                    console.error("Unexpected API response structure:", result);
+                    showError("AIが犬の気持ちを読み取れませんでした。別の写真で試してみてください。");
+                }
+
+            } catch (error) {
+                console.error("Error analyzing dog emotion:", error);
+                showError(`エラーが発生しました: ${error.message}`);
+            } finally {
+                loader.classList.add('hidden');
+            }
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.remove('hidden');
+            speechBubble.classList.remove('visible');
+        }
+
+        imagePreviewContainer.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            imagePreviewContainer.classList.add('border-blue-500');
+        });
+
+        imagePreviewContainer.addEventListener('dragleave', () => {
+            imagePreviewContainer.classList.remove('border-blue-500');
+        });
+
+        imagePreviewContainer.addEventListener('drop', (event) => {
+            event.preventDefault();
+            imagePreviewContainer.classList.remove('border-blue-500');
+            const file = event.dataTransfer.files[0];
+            if (file) {
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                imageUpload.files = dataTransfer.files;
+                imageUpload.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+
+    </script>
+</body>
+</html>
